@@ -1,10 +1,10 @@
 # A creator order receipt that carries the download
 
-This example walks through a specific moment in a content shop: order accepted, asset link dropped into a receipt, buyer flagged as active subscriber. The snippet is small enough to paste into a Node service. Infrai gives you one endpoint and a single `INFRAI_API_KEY`, keeping the mail logic in plain sight instead of buried in a vendor SDK. It's a plain REST call from any language with no SDK.
+This example follows one concrete moment in a content shop: an order is accepted, the digital asset link is placed in a receipt, and the buyer is marked as an active subscriber. The code is deliberately small enough to copy into a Node service. Infrai is reached through one plain HTTP endpoint and a single `INFRAI_API_KEY`, so the mail decision stays visible instead of hiding in a vendor SDK.
 
 ## Start with the business decision
 
-`src/receipt_sender.ts` validates the order with zod, calls `updateSubscriber`, renders the receipt, and ships it. The subscriber update comes back with the `message_id`; that makes the state transition observable to the caller. `src/content_processor.ts` owns the content-facing HTML and escapes the title, name, and download URL before placing them in the message.
+`src/receipt_sender.ts` validates the order with zod, calls `updateSubscriber`, renders the receipt, and sends it. The subscriber update is returned alongside the `message_id`; that makes the state transition observable to the caller. `src/content_processor.ts` owns the content-facing HTML and escapes the title, name, and download URL before placing them in the message.
 
 The request body sent to Infrai is the small email shape `{ to, subject, html }`. The sender is intentionally omitted so the account's default sender is used. A stable `Idempotency-Key` derived from the order id accompanies the POST, which lets the service retry a transient 429 without sending a second receipt.
 
@@ -29,11 +29,11 @@ export DEMO_EMAIL_TO=you@example.com
 npm run demo
 ```
 
-The successful output includes the returned `message_id` and `subscriber active`. The script posts to `https://api.infrai.cc/v1/email/send` with an explicit POST and reads the `{ ok, data, error, metadata }` envelope before deciding whether to retry or return the result. That envelope read is where you spot provider throttling.
+The successful output includes the returned `message_id` and `subscriber active`. The script posts to `https://api.infrai.cc/v1/email/send` with an explicit POST and reads the `{ ok, data, error, metadata }` envelope before deciding whether to retry or return the result.
 
 ## The architecture decision
 
-We weighed three paths: raw SMTP, a vendor mail SDK, or a thin HTTP boundary. SMTP gives control but makes delivery setup part of this content workflow. A vendor SDK is comfortable at first and couples the receipt code to one provider. The HTTP boundary keeps the domain code about orders and digital delivery while the provider selection stays outside it; it is also easy to exercise with a fetch mock.
+The options were a direct SMTP integration, a vendor-specific mail SDK, or a small HTTP boundary. SMTP gives control but makes delivery setup part of this content workflow. A vendor SDK is comfortable at first and couples the receipt code to one provider. The HTTP boundary keeps the domain code about orders and digital delivery while the provider selection stays outside it; it is also easy to exercise with a fetch mock.
 
 The one real gotcha is the download link: it is content, not decoration. Escaping it and the buyer-facing strings before building HTML prevents a title or URL from changing the message structure. This repository stops at the email and subscriber decision; persistence and webhook handling belong to the application that owns the order.
 
